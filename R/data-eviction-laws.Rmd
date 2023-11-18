@@ -1,0 +1,22 @@
+---
+title: "data-eviction-laws"
+output: html_document
+---
+
+```{r}
+
+library(dplyr)
+library(tidycensus)
+library(tidyr)
+
+here::i_am("R/data-acs-nzlud-eviction-lab.Rmd")
+
+```
+
+
+```{r}
+
+# Pull in eviction laws by states
+eviction_laws_st <- readxl::read_excel(here::here("data/LSCEvictionLaws_StateTerritory_Data.xlsx"))
+
+```

@@ -1,0 +1,161 @@
+---
+title: "data-acs"
+output: html_document
+---
+
+
+```{r}
+
+library(dplyr)
+library(tidycensus)
+library(tidyr)
+
+here::i_am("R/data-acs-nzlud-eviction-lab.Rmd")
+
+```
+
+
+```{r}
+
+# Load the ACS variables we want
+
+# v21 <- load_variables(2021, dataset= "acs5")
+
+acs_vars <- c(
+  "median_gross_rent" = "B25064_001",
+  "pop_poverty_status_past_12_months" = "B17001_002",
+  "pop_total" = "B17001_001",
+  "median_hh_income" = "B19013_001",
+  "housing_units_total" = "B25003_001",
+  "housing_units_owner_occupied" = "B25003_002",
+  "housing_units_renter_occupied" = "B25003_003",
+  "median_hh_value" = "B25077_001",
+  "hh_total" = "B25070_001",
+  "hh_rent_burdened" = "B25070_008",
+  "hh_rent_burdened" = "B25070_009",
+  "hh_rent_burdened" = "B25070_010",
+  "rent_burden" = "B25071_001",
+  "housing_units_occupancy_total" = "B25002_001",
+  "housing_units_occupied" = "B25002_002",
+  "housing_units_vacant" = "B25002_003",
+  "pop_total_race_ethnicity" = "B03002_001",
+  "pop_white_nhl" = "B03002_003",
+  "pop_black_nhl" = "B03002_004",
+  "pop_aian_nhl" = "B03002_005",
+  "pop_asian_nhl" = "B03002_006",
+  "pop_nhpi_nhl" = "B03002_007",
+  "pop_another_nhl" = "B03002_008",
+  "pop_two_or_more_nhl" = "B03002_009",
+  "pop_hispanic_latino" = "B03002_012",
+  "hh_type_total" = "B11012_001",
+  "hh_type_single_parent_with_children" = "B11012_010",
+  "hh_type_single_parent_with_children" = "B11012_015",
+  "hh_type_with_children" = "B11012_015",
+  "hh_type_with_children" = "B11012_010",
+  "hh_type_with_children" = "B11012_006",
+  "hh_type_with_children" = "B11012_003"
+)
+
+acs_dta <- get_acs("cbsa", variables = acs_vars, years = 2018)
+
+acs_dta_clean <- acs_dta %>%
+  select(GEOID, NAME, variable, estimate) %>%
+  group_by(GEOID, NAME, variable) %>%
+  summarise(
+    estimate = sum(estimate, na.rm = T)
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = "variable",
+    values_from = "estimate"
+  ) %>%
+  mutate(
+    pct_poverty = pop_poverty_status_past_12_months / pop_total,
+    pct_renter_occupied = housing_units_renter_occupied / housing_units_total,
+    pct_owner_occupied = housing_units_owner_occupied / housing_units_total,
+    pct_rent_burdened = hh_rent_burdened / hh_total,
+    pct_occupied = housing_units_occupied / housing_units_occupancy_total,
+    pct_vacant = housing_units_vacant / housing_units_occupancy_total,
+    pct_white_nhl = pop_white_nhl / pop_total_race_ethnicity,
+    pct_black_nhl = pop_black_nhl / pop_total_race_ethnicity,
+    pct_aian_nhl = pop_aian_nhl / pop_total_race_ethnicity,
+    pct_asian_nhl = pop_asian_nhl / pop_total_race_ethnicity,
+    pct_nhpi_nhl = pop_nhpi_nhl / pop_total_race_ethnicity,
+    pct_another_nhl = pop_another_nhl / pop_total_race_ethnicity,
+    pct_two_or_more_nhl = pop_two_or_more_nhl / pop_total_race_ethnicity,
+    pct_hispanic_latino = pop_hispanic_latino / pop_total_race_ethnicity,
+    pct_hh_type_with_children = hh_type_with_children / hh_type_total,
+    pct_hh_type_single_parent_with_children = hh_type_single_parent_with_children / hh_type_total
+  )
+  
+# Note: what year is best? 5-year estimates? Eviction Lab is using 2018 ACS
+readr::write_csv(acs_dta_clean, here::here("data/acs_msa.csv"))
+
+```
+
+
+```{r}
+
+# Pull in the national zoning and land use dataset form Eviction Lab
+nzlud_msa <- readr::read_csv(here::here("data/nzlud_msa.csv")) %>%
+  mutate(
+    GEOID = stringr::str_pad(cbsa10, width = 5, side = "left", pad = "0")
+  )
+
+```
+
+
+```{r}
+
+# Load in eviction lab data
+county_proprietary_valid <- data.table::fread("https://eviction-lab-data-downloads.s3.amazonaws.com/data-for-analysis/county_proprietary_valid_2000_2018.csv") %>%
+  mutate(
+    cofips = stringr::str_pad(cofips, 5, side = "left", pad = "0")
+  ) %>%
+  filter(year == 2018)
+
+# Load in CBSA to CO crosswalk
+cbsa_to_county <- readr::read_csv(here::here("data/cbsa10_to_county.csv")) %>%
+  mutate(cbsa10 = stringr::str_pad(geoid_cbsa10, 5, side = "left", pad = "0"))
+
+# Join together
+cbsa_proprietary_valid <- left_join(
+    county_proprietary_valid,
+    cbsa_to_county,
+    by = c("cofips" = "geoid_co")
+  ) %>%
+  group_by(cbsa10) %>%
+  summarise(
+    filings = sum(filings),
+    avg_filing_rate = mean(filing_rate),
+    threatened = sum(threatened),
+    avg_threatened_rate = mean(threatened_rate),
+    judgements = sum(judgements),
+    avg_judgement_rate = mean(judgement_rate)
+  )
+  
+```
+
+
+```{r}
+
+combined_dta <- left_join(
+    cbsa_proprietary_valid,
+    acs_dta_clean,
+    by = c("cbsa10" = "GEOID")
+  ) %>% 
+  left_join(
+    .,
+    nzlud_msa,
+    by = c("cbsa10" = "GEOID")
+  ) %>%
+  mutate(
+    filings_rate_acs = (filings / housing_units_renter_occupied) * 100,
+    threatened_rate_acs = (threatened / housing_units_renter_occupied) * 100,
+    judgements_rate_acs = (judgements / housing_units_renter_occupied) * 100
+  )
+
+readr::write_csv(combined_dta, here::here("data/cbsa_eviction_proprietary_acs_nzlud_2018.csv"))
+
+```
+
+
