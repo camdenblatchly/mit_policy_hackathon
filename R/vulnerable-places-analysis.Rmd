@@ -1,0 +1,109 @@
+---
+title: "vulnerable-places-analysis"
+output: html_document
+---
+
+```{r}
+
+library(dplyr)
+library(tidycensus)
+library(tidyr)
+library(ggplot2)
+library(cori.charts)
+
+library(sysfonts)
+library(showtext)
+
+sysfonts::font_add_google("Lato")
+font_add(
+  "TT Hoves",
+  regular = "TypeType - TT Hoves Regular.ttf",
+  bold = "TypeType - TT Hoves Bold.ttf",
+  italic = "TypeType - TT Hoves Italic.ttf",
+  bolditalic = "TypeType - TT Hoves Bold Italic.ttf"
+)
+showtext_auto()
+showtext_opts(dpi = 300)
+
+here::i_am("R/vulnerable-places-analysis.Rmd")
+
+```
+
+
+```{r}
+
+# v21 <- load_variables(2021, "acs1")
+# v18 <- load_variables(2018, "acs5")
+
+```
+
+
+```{r}
+
+acs_vars <- c(
+  "renter_occupied_5_9_units" = "B25032_018",
+  "renter_occupied_10_19_units" = "B25032_019",
+  "renter_occupied_20_49_units" = "B25032_021",
+  "renter_occupied_50_plus_units" = "B25032_020",
+  "total_renter_occupied_units" = "B25032_013"
+)
+
+acs_dta_raw <- get_acs("cbsa", variables = acs_vars, year = 2018) %>%
+  select(GEOID, NAME, variable, estimate) %>%
+  tidyr::pivot_wider(
+    names_from = "variable",
+    values_from = "estimate"
+  ) %>%
+  mutate(
+    renter_occupied_5_plus = (renter_occupied_5_9_units + renter_occupied_10_19_units + renter_occupied_20_49_units + renter_occupied_50_plus_units),
+    pct_renter_occupied_5_9_units = renter_occupied_5_9_units / total_renter_occupied_units,
+    pct_renter_occupied_10_19_units = renter_occupied_10_19_units / total_renter_occupied_units,
+    pct_renter_occupied_20_49_units = renter_occupied_20_49_units / total_renter_occupied_units,
+    pct_renter_occupied_50_plus_units = renter_occupied_50_plus_units / total_renter_occupied_units,
+    pct_renter_occupied_20_plus_units = (renter_occupied_20_49_units + renter_occupied_50_plus_units) / total_renter_occupied_units,
+    pct_renter_occupied_10_plus_units = (renter_occupied_10_19_units + renter_occupied_20_49_units + renter_occupied_50_plus_units) / total_renter_occupied_units,
+    pct_renter_occupied_5_plus_units = (renter_occupied_5_9_units + renter_occupied_10_19_units + renter_occupied_20_49_units + renter_occupied_50_plus_units) / total_renter_occupied_units
+  )
+
+readr::write_csv(acs_dta_raw, here::here("data/housing_stock_by_city_all_2018.csv"))
+
+acs_dta_raw %>%
+  filter(stringr::str_detect(NAME, "Metro")) %>%
+  readr::write_csv(here::here("data/housing_stock_by_city_metro_2018.csv"))
+
+q_housing_units <- quantile(acs_dta_raw$total_renter_occupied_units, probs = c(0.25, 0.5, 0.75))
+
+acs_dta_min_housing <- acs_dta_raw %>%
+  filter(total_renter_occupied_units > q_housing_units[["75%"]])
+
+q_pct_5_plus <- quantile(acs_dta_min_housing$pct_renter_occupied_5_plus_units, probs = c(0.25, 0.5, 0.75))
+
+acs_dta <- acs_dta_min_housing %>%
+  filter(pct_renter_occupied_5_plus_units > q_pct_5_plus[["75%"]])
+
+readr::write_csv(acs_dta, here::here("data/housing_stock_by_city_subset_2018.csv"))
+
+
+```
+
+
+```{r}
+
+fig <- acs_dta %>%
+  ggplot(aes(x = pct_renter_occupied_5_plus_units)) +
+  geom_histogram(binwidth = 0.02, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of CBSAs", x = "Percent of housing with greater than 5 units", y = "Frequency") +
+  theme_cori() +
+  theme(
+    panel.grid.major.y = element_line(color = "#d0d2ce", linewidth = .25, linetype = "solid")
+  )
+  
+save_plot(fig, here::here("export/histogram_of_large_unit_cities.png"), add_logo = FALSE)
+
+```
+
+
+
+
+
+

@@ -1,0 +1,187 @@
+---
+title: "realpage-analysis"
+output: html_document
+---
+
+```{r}
+
+library(dplyr)
+library(tidycensus)
+library(tidyr)
+library(ggplot2)
+library(cori.charts)
+
+library(sysfonts)
+library(showtext)
+
+sysfonts::font_add_google("Lato")
+font_add(
+  "TT Hoves",
+  regular = "TypeType - TT Hoves Regular.ttf",
+  bold = "TypeType - TT Hoves Bold.ttf",
+  italic = "TypeType - TT Hoves Italic.ttf",
+  bolditalic = "TypeType - TT Hoves Bold Italic.ttf"
+)
+showtext_auto()
+showtext_opts(dpi = 300)
+
+here::i_am("R/realpage-analysis-tract.Rmd")
+
+```
+
+Plan:
+- Metro areas with the largest increase in rents vs increase in rent burden
+- Metro areas with the largest increase in rents vs eviction rate
+- Maybe: Specific Realpage cities: Washington, D.C., Seattle, Denver, Nashville, Atlanta rent increase 
+
+Data needs:
+- Pct increase in rents
+- Pct increase in pop that is rent burdened
+- Eviction rates in 2021? 2018?
+
+
+```{r}
+
+# Tract level rent estimates?
+
+# Load the ACS variables we want
+
+# v21 <- load_variables(2021, dataset= "acs5")
+
+acs_vars <- c(
+  "median_gross_rent" = "B25064_001",
+  "median_hh_income" = "B19013_001",
+  "housing_units_total" = "B25003_001",
+  "housing_units_owner_occupied" = "B25003_002",
+  "housing_units_renter_occupied" = "B25003_003",
+  "median_hh_value" = "B25077_001",
+  "hh_total" = "B25070_001",
+  "hh_rent_burdened" = "B25070_008",
+  "hh_rent_burdened" = "B25070_009",
+  "hh_rent_burdened" = "B25070_010",
+  "rent_burden" = "B25071_001"
+)
+
+states <- tigris::states(cb = TRUE, year = 2018) %>%
+  filter(STATEFP <= "56") %>%
+  pull(STATEFP) %>%
+  unique()
+  
+acs_dta_13 <- get_acs("tract", state =states, variables = acs_vars, year = 2013)
+acs_dta_18 <- get_acs("tract", state =states, variables = acs_vars, year = 2018)
+
+acs_dta_clean_13 <- acs_dta_13 %>%
+  select(GEOID, NAME, variable, estimate) %>%
+  group_by(GEOID, NAME, variable) %>%
+  summarise(
+    estimate = sum(estimate, na.rm = T)
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = "variable",
+    values_from = "estimate",
+    names_glue = sprintf('{%s}_2013', "variable"),
+  ) %>%
+  mutate(
+    pct_renter_occupied_2013 = housing_units_renter_occupied_2013 / housing_units_total_2013,
+    pct_owner_occupied_2013 = housing_units_owner_occupied_2013 / housing_units_total_2013,
+    pct_rent_burdened_2013 = hh_rent_burdened_2013 / hh_total_2013
+  )
+
+acs_dta_clean_18 <- acs_dta_18 %>%
+  select(GEOID, NAME, variable, estimate) %>%
+  group_by(GEOID, NAME, variable) %>%
+  summarise(
+    estimate = sum(estimate, na.rm = T)
+  ) %>%
+  tidyr::pivot_wider(
+    names_from = "variable",
+    values_from = "estimate",
+    names_glue = sprintf('{%s}_2018', "variable"),
+  ) %>%
+  mutate(
+    pct_renter_occupied_2018 = housing_units_renter_occupied_2018 / housing_units_total_2018,
+    pct_owner_occupied_2018 = housing_units_owner_occupied_2018 / housing_units_total_2018,
+    pct_rent_burdened_2018 = hh_rent_burdened_2018 / hh_total_2018
+  )
+
+acs_dta <- left_join(
+    acs_dta_clean_13,
+    acs_dta_clean_18,
+    by = "GEOID"
+  ) %>%
+  mutate(
+    pct_change_median_gross_rent = ifelse(
+      median_gross_rent_2013 > 0,
+      (median_gross_rent_2018 - median_gross_rent_2013) / median_gross_rent_2013, NA),
+    pct_change_rent_burden = ifelse(
+      rent_burden_2013 > 0,
+      (rent_burden_2018 - rent_burden_2013) / rent_burden_2013, NA),
+    pct_change_pct_rent_burdened = ifelse(
+      pct_rent_burdened_2013 > 0,
+      (pct_rent_burdened_2018 - pct_rent_burdened_2013) / pct_rent_burdened_2013, NA),
+  )
+
+```
+
+
+```{r}
+
+eviction_proprietary_tract <- data.table::fread("https://eviction-lab-data-downloads.s3.amazonaws.com/data-for-analysis/tract_proprietary_valid_2000_2018.csv") %>%
+  mutate(
+    geoid_tr = stringr::str_pad(fips, 11, side = "left", pad = "0")
+  ) %>%
+  filter(year == 2018)
+```
+
+
+```{r}
+
+dta <- left_join(
+  acs_dta,
+  eviction_proprietary_tract,
+  by = c("GEOID" = "geoid_tr")
+)
+
+```
+
+
+```{r}
+
+# tracts: increase in rents vs increase in rent burden
+fig <- dta %>%
+  ggplot(aes(x = pct_change_median_gross_rent, y = pct_change_rent_burden)) +
+  geom_point(alpha = 0.5, color = "#211448", aes(size = housing_units_renter_occupied_2018)) +
+  scale_x_continuous(
+    limits = c(0, 4.75),
+    labels = scales::percent_format(accuracy = 1, scale = 100),
+    expand = expansion(mult = c(0.01, 0))
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1, scale = 100),
+    expand = expansion(mult = c(0.05, 0.05))
+  ) +
+  scale_size_continuous(labels = scales::number_format(big.mark = ",")) +
+  geom_smooth(color = "#E74F2A", method = "lm") +
+  ggpubr::stat_cor(
+    label.x.npc = 0.8,
+    label.y.npc = 0.85
+  ) +
+  theme_cori() +
+  theme(
+    panel.grid.major.y = element_line(color = "#d0d2ce", linewidth =.1, linetype = "solid"),
+    panel.grid.major.x = element_line(color = "#d0d2ce", linewidth =.1, linetype = "solid"),
+    axis.line.x = element_blank(),
+    plot.caption = element_text(family = "Lato", color = "dimgray", size = 8)
+  ) +
+  labs(
+    title = "Percent change in median gross rent vs. percent change in rent burden",
+    subtitle = "Census tracts, circles sized by number of renter occupied units, 2013-2018",
+    x = "Percent change in median gross rent",
+    y = "Percent change in rent burden",
+    caption = "Source: 2013 and 2018 ACS 5-year estimates.Gromis, Ashley, Ian Fellows, James R. Hendrickson, Lavar Edmonds, Lillian Leung, Adam Porton, and Matthew Desmond.\nEstimating Eviction Prevalence across the United States. Princeton University Eviction Lab.\nhttps://data-downloads.evictionlab.org/#estimating-eviction-prevalance-across-us/. Deposited May 13, 2022."
+  )
+
+save_plot(fig, here::here("export/pct_change_median_gross_rent_vs_pct_change_rent_burden_tract.png"), add_logo = FALSE)
+
+
+```

@@ -9,7 +9,7 @@ library(dplyr)
 library(tidycensus)
 library(tidyr)
 
-here::i_am("R/data-acs-nzlud-eviction-lab.Rmd")
+here::i_am("R/data-eviction-laws.Rmd")
 
 ```
 
@@ -17,6 +17,53 @@ here::i_am("R/data-acs-nzlud-eviction-lab.Rmd")
 ```{r}
 
 # Pull in eviction laws by states
-eviction_laws_st <- readxl::read_excel(here::here("data/LSCEvictionLaws_StateTerritory_Data.xlsx"))
+eviction_laws_st <- readxl::read_excel(here::here("data/LSCEvictionLaws_StateTerritory_Data.xlsx")) %>%
+  mutate(
+    state = tolower(stringr::str_replace(Jurisdictions, " ", ""))
+  )
 
 ```
+
+
+```{r}
+
+# Pull in ETS data since 2020
+ets_monthly <- data.table::fread("https://eviction-lab-data-downloads.s3.amazonaws.com/ets/allstates_monthly_2020_2021.csv") %>%
+  mutate(
+    geoid_st = stringr::str_sub(GEOID, 1, 2),
+    date = as.Date(paste0("01/", month), format = "%d/%m/%Y")
+  )
+
+```
+
+```{r}
+
+dta <- left_join(
+    ets_monthly,
+    eviction_laws_st,
+    by = "state"
+  ) %>%
+  filter(
+    `Effective Date` > as.POSIXct("01/01/2020", format = "%m/%d/%Y")
+  ) %>%
+  select(!tidyr::contains("_citation")) %>%
+  select(!tidyr::contains("_caution"))
+
+```
+
+```{r}
+
+tract_to_cbsa <- readr::read_csv(here::here("data/census_tract_to_cbsa.csv")) %>%
+  mutate(
+    tract = gsub("\\.", "", tract),
+    geoid_tr = paste0(county, tract)
+  ) %>%
+  select(geoid_tr, cbsa10, cbsaname10) %>%
+  distinct()
+
+```
+
+
+
+
+

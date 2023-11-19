@@ -1,0 +1,159 @@
+---
+title: "eviction-laws-subset"
+output: html_document
+---
+
+```{r}
+
+library(dplyr)
+library(tidycensus)
+library(tidyr)
+
+here::i_am("R/eviction-laws-subset.Rmd")
+
+```
+
+
+```{r}
+
+# Pull in eviction laws by states
+eviction_laws_st <- readxl::read_excel(here::here("data/LSCEvictionLaws_StateTerritory_Data.xlsx")) %>%
+  mutate(
+    state = tolower(stringr::str_replace(Jurisdictions, " ", ""))
+  ) %>%
+  select(!tidyr::contains("_citation")) %>%
+  select(!tidyr::contains("_caution"))
+
+```
+
+
+```{r}
+
+tract_to_cbsa <- readr::read_csv(here::here("data/census_tract_to_cbsa.csv")) %>%
+  mutate(
+    tract = gsub("\\.", "", tract),
+    geoid_tr = paste0(county, tract)
+  ) %>%
+  select(geoid_tr, cbsa10, cbsaname10) %>%
+  distinct()
+
+cbsa_subset <- readr::read_csv(here::here("data/housing_stock_by_city_subset.csv"))
+
+subset_tracts <- left_join(
+    cbsa_subset,
+    tract_to_cbsa,
+    by = c("GEOID" = "cbsa10")
+  ) %>% 
+  filter(!is.na(geoid_tr)) %>%
+  pull(geoid_tr) %>%
+  unique()
+
+```
+
+
+```{r}
+
+# Pull in ETS data since 2020
+ets_monthly <- data.table::fread("https://eviction-lab-data-downloads.s3.amazonaws.com/ets/allstates_monthly_2020_2021.csv") %>%
+  mutate(
+    geoid_st = stringr::str_sub(GEOID, 1, 2),
+    date = as.Date(paste0("01/", month), format = "%d/%m/%Y")
+  ) %>%
+  group_by(GEOID, state) %>%
+  summarise(
+    avg_filings = mean(filings_2020),
+    filings = sum(filings_2020),
+    filings_avg_sum = sum(filings_avg),
+    filings_avg = mean(filings_avg)
+  ) %>%
+  filter(GEOID %in% subset_tracts)
+
+```
+
+
+```{r}
+
+eviction_filing_law_dta <- left_join(
+    ets_monthly,
+    eviction_laws_st,
+    by = "state"
+  ) %>%
+  filter(
+    `Effective Date` > as.POSIXct("01/01/2020", format = "%m/%d/%Y")
+  ) %>%
+  select(!tidyr::contains("_citation")) %>%
+  select(!tidyr::contains("_caution"))
+
+```
+
+
+```{r}
+
+SEL_Law <- eviction_filing_law_dta %>%
+  group_by(SEL_Law) %>%
+  summarise(
+    avg_filings = mean(avg_filings),
+    filings = mean(filings),
+    filings_avg_sum = mean(filings_avg_sum),
+    filings_avg = mean(filings_avg)
+  )
+
+```
+
+
+```{r}
+
+SEL_LLHalt <- eviction_filing_law_dta %>%
+  group_by(SEL_LLHalt) %>%
+  summarise(
+    avg_filings = mean(avg_filings),
+    filings = mean(filings),
+    filings_avg_sum = mean(filings_avg_sum),
+    filings_avg = mean(filings_avg)
+  )
+
+```
+
+
+```{r}
+
+SEL_DisposeProperty <- eviction_filing_law_dta %>%
+  group_by(SEL_DisposeProperty) %>%
+  summarise(
+    avg_filings = mean(avg_filings),
+    filings = mean(filings),
+    filings_avg_sum = mean(filings_avg_sum),
+    filings_avg = mean(filings_avg)
+  )
+
+
+```
+
+
+```{r}
+
+SEL_MinNonpayment <- eviction_filing_law_dta %>%
+  group_by(SEL_MinNonpayment) %>%
+  summarise(
+    avg_filings = mean(avg_filings),
+    filings = mean(filings),
+    filings_avg_sum = mean(filings_avg_sum),
+    filings_avg = mean(filings_avg)
+  )
+
+
+```
+
+```{r}
+
+# SEL_BackRentAmount
+SEL_BackRentAmount <- eviction_filing_law_dta %>%
+  group_by(SEL_BackRentAmount) %>%
+  summarise(
+    avg_filings = mean(avg_filings),
+    filings = mean(filings),
+    filings_avg_sum = mean(filings_avg_sum),
+    filings_avg = mean(filings_avg)
+  )
+
+```
