@@ -6,6 +6,3 @@
 *.Rproj
 
 .DS_Store
-
-/data/*.csv
-/data/*.xlsx
