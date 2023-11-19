@@ -25,28 +25,12 @@ font_add(
 showtext_auto()
 showtext_opts(dpi = 300)
 
-here::i_am("R/realpage-analysis-tract.Rmd")
+here::i_am("R/rent-burden-eviction-analysis-tr.Rmd")
 
 ```
 
-Plan:
-- Metro areas with the largest increase in rents vs increase in rent burden
-- Metro areas with the largest increase in rents vs eviction rate
-- Maybe: Specific Realpage cities: Washington, D.C., Seattle, Denver, Nashville, Atlanta rent increase 
-
-Data needs:
-- Pct increase in rents
-- Pct increase in pop that is rent burdened
-- Eviction rates in 2021? 2018?
-
 
 ```{r}
-
-# Tract level rent estimates?
-
-# Load the ACS variables we want
-
-# v21 <- load_variables(2021, dataset= "acs5")
 
 acs_vars <- c(
   "median_gross_rent" = "B25064_001",
@@ -131,6 +115,7 @@ eviction_proprietary_tract <- data.table::fread("https://eviction-lab-data-downl
     geoid_tr = stringr::str_pad(fips, 11, side = "left", pad = "0")
   ) %>%
   filter(year == 2018)
+
 ```
 
 

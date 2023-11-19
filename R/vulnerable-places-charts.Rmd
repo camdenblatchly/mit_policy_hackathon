@@ -190,6 +190,8 @@ save_plot(fig, here::here("export/pct_5_plus_units_vs_pct_change_rent.png"), add
 
 ```{r}
 
+# Rent increases in cities with widespread use of algorithmic rent pricing
+
 focus_cbsa <- c(
   "42660", # Seattle
   "47900", # DC
@@ -249,12 +251,6 @@ save_plot(fig, here::here("export/rent_increases_in_major_algo_metro_areas.png")
 
 ```
 
-
-```{r}
-
-
-
-```
 
 
 

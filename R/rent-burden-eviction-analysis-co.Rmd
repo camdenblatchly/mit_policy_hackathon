@@ -25,28 +25,11 @@ font_add(
 showtext_auto()
 showtext_opts(dpi = 300)
 
-here::i_am("R/realpage-analysis-co-cbsa.Rmd")
+here::i_am("R/rent-burden-eviction-analysis-co.Rmd")
 
 ```
 
-Plan:
-- Metro areas with the largest increase in rents vs increase in rent burden
-- Metro areas with the largest increase in rents vs eviction rate
-- Maybe: Specific Realpage cities: Washington, D.C., Seattle, Denver, Nashville, Atlanta rent increase 
-
-Data needs:
-- Pct increase in rents
-- Pct increase in pop that is rent burdened
-- Eviction rates in 2021? 2018?
-
-
 ```{r}
-
-# Tract level rent estimates?
-
-# Load the ACS variables we want
-
-# v21 <- load_variables(2021, dataset= "acs5")
 
 acs_vars <- c(
   "median_gross_rent" = "B25064_001",
@@ -61,11 +44,6 @@ acs_vars <- c(
   "hh_rent_burdened" = "B25070_010",
   "rent_burden" = "B25071_001"
 )
-
-# states <- tigris::states(cb = TRUE, year = 2018) %>%
-#   filter(STATEFP <= "56") %>%
-#   pull(STATEFP) %>%
-#   unique()
   
 acs_dta_13 <- get_acs("county", variables = acs_vars, year = 2013)
 acs_dta_18 <- get_acs("county", variables = acs_vars, year = 2018)
@@ -132,48 +110,6 @@ eviction_proprietary_co <- data.table::fread("https://eviction-lab-data-download
   ) %>%
   filter(year == 2018)
 
-
-# eviction_proprietary_co_2013 <- data.table::fread("https://eviction-lab-data-downloads.s3.amazonaws.com/data-for-analysis/county_proprietary_valid_2000_2018.csv") %>%
-#   mutate(
-#     geoid_co = stringr::str_pad(cofips, 5, side = "left", pad = "0")
-#   ) %>%
-#   filter(year == 2013) %>%
-#   rename(
-#     filings_2013 = filings,
-#     filing_rate_2013 = filing_rate,
-#     threatened_2013 = threatened,
-#     threatened_rate_2013 = threatened_rate
-#   ) %>%
-#   select(geoid_co, filings_2013, filing_rate_2013, threatened_2013, threatened_rate_2013)
-# 
-# eviction_proprietary_co_2018 <- data.table::fread("https://eviction-lab-data-downloads.s3.amazonaws.com/data-for-analysis/county_proprietary_valid_2000_2018.csv") %>%
-#   mutate(
-#     geoid_co = stringr::str_pad(cofips, 5, side = "left", pad = "0")
-#   ) %>%
-#   filter(year == 2018) %>%
-#   rename(
-#     filings_2018 = filings,
-#     filing_rate_2018 = filing_rate,
-#     threatened_2018 = threatened,
-#     threatened_rate_2018 = threatened_rate
-#   ) %>%
-#   select(geoid_co, filings_2018, filing_rate_2018, threatened_2018, threatened_rate_2018)
-# 
-# eviction_proprietary_co <- inner_join(
-#   eviction_proprietary_co_2013,
-#   eviction_proprietary_co_2018,
-#   by = "geoid_co"
-# ) %>%
-#   mutate(
-#     pct_change_threatened_rate = ifelse(
-#       threatened_rate_2013 > 0,
-#       (threatened_rate_2018 - threatened_rate_2013) / threatened_rate_2013, NA),
-#     pct_change_filing_rate = ifelse(
-#       filing_rate_2013 > 0,
-#       (filing_rate_2018 - filing_rate_2013) / filing_rate_2013, NA),
-#   )
-
-
 ```
 
 
@@ -191,7 +127,6 @@ dta <- left_join(
 ```{r}
 
 fig <- dta %>%
-  # filter(housing_units_renter_occupied_2018 > 200000) %>%
   ggplot(aes(x = pct_change_median_gross_rent, y = pct_change_rent_burden)) +
   geom_point(alpha = 0.5, color = "#211448", aes(size = housing_units_renter_occupied_2018)) +
   scale_x_continuous(
