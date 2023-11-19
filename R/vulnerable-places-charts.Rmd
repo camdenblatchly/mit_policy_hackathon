@@ -190,20 +190,39 @@ save_plot(fig, here::here("export/pct_5_plus_units_vs_pct_change_rent.png"), add
 
 ```{r}
 
-cori_poverty %>%
+focus_cbsa <- c(
+  "42660", # Seattle
+  "47900", # DC
+  "19740", # Denver
+  "34980", # Nashville
+  "12060" # Atlanta
+)
+
+fig <- pct_change_dta %>%
+  filter(GEOID %in% focus_cbsa) %>%
+  mutate(
+    name = case_match(
+      GEOID,
+      "42660" ~ "Seattle",
+      "47900" ~ "Washington, D.C.",
+      "19740" ~ "Denver",
+      "34980" ~ "Nashville",
+      "12060" ~ "Atlanta"
+        )
+  ) %>%
   ggplot2::ggplot(
     aes(
-      estimate_below_poverty_level_2019,
-      reorder(rin_community, estimate_below_poverty_level_2019)
+      pct_change_median_gross_rent,
+      reorder(name, pct_change_median_gross_rent)
     )
   ) +
-  ggplot2::geom_col(fill = cori_colors["Emerald"]) +
+  ggplot2::geom_col(fill = "#49759C") +
   geom_text(
     aes(
-      label = scales::number(
-        estimate_below_poverty_level_2019,
+      label = scales::percent(
+        pct_change_median_gross_rent,
         accuracy = 1,
-        big.mark = ","
+        scale = 100
       )
     ),
     fontface = "bold",
@@ -216,17 +235,24 @@ cori_poverty %>%
   ) +
   theme_cori_horizontal_bars() +
   ggplot2::theme(
-    plot.title = element_text(family = "Lato"),
-    plot.subtitle = element_text(family = "Lato"),
     panel.grid.major.x = element_blank()
   ) +
   ggplot2::labs(
-    title = "Population living below the poverty level",
-    subtitle = "For select RIN communities (2019)",
+    title = "Rents have increased more than 15% in metropolitan areas experiencing\nwidespread algorithmic rental pricing ",
+    subtitle = "Percent change between 2013 and 2018 median gross rents",
     y = NULL,
     x = NULL,
-    caption = "Source: ACS 5-year estimates (2019)"
+    caption = "Source: American Community Survey 2013 and 2018 5-year estimates"
   )
+
+save_plot(fig, here::here("export/rent_increases_in_major_algo_metro_areas.png"), add_logo = F, chart_height = 4)
+
+```
+
+
+```{r}
+
+
 
 ```
 

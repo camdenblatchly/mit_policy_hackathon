@@ -59,6 +59,7 @@ ets_monthly <- data.table::fread("https://eviction-lab-data-downloads.s3.amazona
     geoid_st = stringr::str_sub(GEOID, 1, 2),
     date = as.Date(paste0("01/", month), format = "%d/%m/%Y")
   ) %>%
+  filter(date >= as.Date("2021-01-01", format = "%Y-%m-%d")) %>%
   group_by(GEOID, state) %>%
   summarise(
     avg_filings = mean(filings_2020),
@@ -68,8 +69,8 @@ ets_monthly <- data.table::fread("https://eviction-lab-data-downloads.s3.amazona
   ) %>%
   filter(GEOID %in% subset_tracts)
 
-```
 
+```
 
 ```{r}
 
@@ -79,7 +80,7 @@ eviction_filing_law_dta <- left_join(
     by = "state"
   ) %>%
   filter(
-    `Effective Date` > as.POSIXct("01/01/2020", format = "%m/%d/%Y")
+    `Effective Date` > as.POSIXct("01/01/2019", format = "%m/%d/%Y")
   ) %>%
   select(!tidyr::contains("_citation")) %>%
   select(!tidyr::contains("_caution"))
@@ -149,6 +150,30 @@ SEL_MinNonpayment <- eviction_filing_law_dta %>%
 # SEL_BackRentAmount
 SEL_BackRentAmount <- eviction_filing_law_dta %>%
   group_by(SEL_BackRentAmount) %>%
+  summarise(
+    avg_filings = mean(avg_filings),
+    filings = mean(filings),
+    filings_avg_sum = mean(filings_avg_sum),
+    filings_avg = mean(filings_avg)
+  )
+
+```
+
+```{r}
+
+# SEL_AccessRecords
+SEL_AccessRecords <- eviction_filing_law_dta %>%
+  group_by(SEL_AccessRecords) %>%
+  summarise(
+    avg_filings = mean(avg_filings),
+    filings = mean(filings),
+    filings_avg_sum = mean(filings_avg_sum),
+    filings_avg = mean(filings_avg)
+  )
+
+# SEL_Mediation
+SEL_Mediation <- eviction_filing_law_dta %>%
+  group_by(SEL_Mediation) %>%
   summarise(
     avg_filings = mean(avg_filings),
     filings = mean(filings),

@@ -103,6 +103,53 @@ save_plot(fig, here::here("export/histogram_of_large_unit_cities.png"), add_logo
 ```
 
 
+```{r}
+
+cbsa_geos <- tigris::core_based_statistical_areas(cb = TRUE, year = 2018) %>%
+  filter()
+
+states <- tigris::states(cb = TRUE, year = 2018) %>%
+  filter(GEOID <= "56") %>%
+  tigris::shift_geometry(position = "below")
+
+chrt_dta <- inner_join(
+  acs_dta,
+  cbsa_geos,
+  by = "GEOID"
+) %>% 
+  sf::st_as_sf() %>%
+  tigris::shift_geometry(position = "below")
+
+fig <- ggplot(chrt_dta) +
+  geom_sf(data = states, fill = "#d0d2ce") +
+  geom_sf(aes(fill = pct_renter_occupied_5_plus_units)) +
+  scale_fill_gradient2(
+    low = "#F8D6D6",
+    midpoint = .65,
+    mid = "#BA578C",
+    high = "#211448",
+    name = "Percent of rentals with 5 or more units",
+    na.value = "#d0d2ce",
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  theme_cori_map() +
+  theme(
+    legend.key.width = unit(40, "pt")
+  ) +
+  labs(
+    title = "Metropolitan areas with high shares of large multifamily units",
+    subtitle = "Percent of rentals with 5 or more units, 2018",
+    x = NULL,
+    y = NULL,
+    caption = "Source: 2018 ACS 5-year estimates"
+  )
+
+save_plot(fig, here::here("export/vulnerable_cities_mapped.png"), add_logo = FALSE, chart_height = 7.2)
+
+
+```
+
+
 
 
 
